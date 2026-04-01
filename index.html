@@ -387,6 +387,15 @@ body::before {
     overflow: hidden;
     white-space: nowrap;
     border-right: 1px solid var(--bg-void);
+    padding: 0 2px;
+}
+.map-segment span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: clip;
+    min-width: 0;
+    max-width: 100%;
+    display: block;
 }
 .map-segment:hover {
     filter: brightness(1.3);
@@ -496,6 +505,7 @@ body::before {
 @media (max-width: 640px) {
     /* 오디오 바 */
     #audio-bar { padding: 10px 12px; }
+    #audio-map { margin-top: 14px; }
     #audio-controls { gap: 6px; }
     #play-btn { width: 36px; height: 36px; font-size: 14px; }
     .skip-btn { width: 30px; height: 30px; font-size: 11px; }
@@ -828,7 +838,7 @@ function buildAudioMap() {
         seg.dataset.idx = s.idx;
         seg.style.left = left + '%';
         seg.style.width = width + '%';
-        seg.textContent = slide.id;
+        seg.innerHTML = '<span>' + slide.id + '</span>';
         seg.title = slide.id + ' — ' + slide.title;
         seg.onclick = () => {
             audio.currentTime = s.start;
