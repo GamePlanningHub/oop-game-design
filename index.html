@@ -722,11 +722,13 @@ body {
       <span id="time-display">0:00 / 0:00</span>
       <input type="range" id="seek-bar" min="0" max="86400" value="0" step="0.1">
       <select id="speed-select" onchange="changeSpeed(this.value)">
+        <option value="0.5">0.5x</option>
         <option value="0.75">0.75x</option>
-        <option value="1" selected>1x</option>
+        <option value="1" selected>1.0x</option>
         <option value="1.25">1.25x</option>
         <option value="1.5">1.5x</option>
-        <option value="2">2x</option>
+        <option value="1.75">1.75x</option>
+        <option value="2">2.0x</option>
       </select>
     </div>
     <div id="audio-map"></div>
@@ -759,8 +761,14 @@ body {
     <div id="index-overlay-list"></div>
   </div>
 </div>
-<div id="subtitle-bar">
+<div id="subtitle-box" class="pos-bottom">
   <span id="subtitle-text"></span>
+</div>
+<div id="sub-controls">
+  <button class="sub-ctrl-btn" id="sub-pos-btn" title="위치 변경"><span id="sub-pos-icon">↕</span></button>
+  <button class="sub-ctrl-btn" id="sub-size-up" title="글자 크게">A+</button>
+  <button class="sub-ctrl-btn" id="sub-size-dn" title="글자 작게">A-</button>
+  <button class="sub-ctrl-btn" id="sub-hide-btn" title="자막 숨기기">CC</button>
 </div>
 <script>
 const SLIDES = [
@@ -1016,11 +1024,13 @@ function showSlide(index) {
     contentEl.innerHTML = slide.content;
     const badge = document.getElementById('slide-badge');
     if (slide.hasAudio) {
-        badge.textContent = '🎵 오디오 포함';
-        badge.className = 'badge-audio';
+        badge.textContent = '';
+        badge.className = '';
+        badge.style.display = 'none';
     } else {
-        badge.textContent = '📖 교안 전용';
+        badge.textContent = '교안 전용';
         badge.className = 'badge-no-audio';
+        badge.style.display = '';
     }
     // 네비게이션 도트 활성화
     document.querySelectorAll('.nav-dot').forEach((dot, i) => {
@@ -1091,10 +1101,23 @@ function skipTime(sec) {
     audio.currentTime = Math.max(0, Math.min(audio.duration || 0, audio.currentTime + sec));
 }
 
+const SPEED_STEPS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 document.addEventListener('keydown', (e) => {
     if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
     if (e.code === 'ArrowLeft') { showSlide(currentSlide - 1); isAutoSync = false; }
     if (e.code === 'ArrowRight') { showSlide(currentSlide + 1); isAutoSync = false; }
+    if (e.key === '-' || e.key === '_') {
+        const cur = SPEED_STEPS.indexOf(audio.playbackRate);
+        const idx = cur > 0 ? cur - 1 : 0;
+        audio.playbackRate = SPEED_STEPS[idx];
+        document.getElementById('speed-select').value = SPEED_STEPS[idx];
+    }
+    if (e.key === '=' || e.key === '+') {
+        const cur = SPEED_STEPS.indexOf(audio.playbackRate);
+        const idx = cur < SPEED_STEPS.length - 1 ? (cur === -1 ? 2 : cur + 1) : SPEED_STEPS.length - 1;
+        audio.playbackRate = SPEED_STEPS[idx];
+        document.getElementById('speed-select').value = SPEED_STEPS[idx];
+    }
 });
 
 function updateSubtitle(t) {
@@ -1145,9 +1168,187 @@ function closeOverlay() {
     document.getElementById('index-overlay').classList.remove('open');
 }
 
+// 가로 스크롤 영역: 마우스 휠 → 가로 스크롤 변환
+document.querySelectorAll('#audio-map, #slide-nav').forEach(el => {
+    el.addEventListener('wheel', (e) => {
+        if (el.scrollWidth <= el.clientWidth) return; // 스크롤 불필요
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+    }, {passive: false});
+});
+
 init();
 buildOverlayIndex();
+initSubtitleControls();
 
+// ========== 플로팅 자막 드래그 + 컨트롤 ==========
+function initSubtitleControls() {
+    const box = document.getElementById('subtitle-box');
+    if (!box) return;
+    const mobileQuery = window.matchMedia('(max-width: 900px)');
+    let isMobile = mobileQuery.matches;
+    mobileQuery.addEventListener('change', (e) => { isMobile = e.matches; });
+
+    // localStorage에서 설정 복원
+    const saved = JSON.parse(localStorage.getItem('sc-sub-settings') || '{}');
+    let fontSize = saved.fontSize || 16;
+    let posMode = saved.posMode || 'bottom'; // bottom, top, overlay, hidden, free
+    let freeX = saved.freeX;
+    let freeY = saved.freeY;
+    let freeW = saved.freeW;
+
+    const subText = document.getElementById('subtitle-text');
+    subText.style.fontSize = fontSize + 'px';
+
+    // 위치 모드 적용
+    function applyPos(mode) {
+        posMode = mode;
+        box.classList.remove('free', 'hidden');
+        if (mode === 'hidden') {
+            box.classList.add('hidden');
+        } else if (mode === 'free') {
+            box.classList.add('free');
+            box.style.left = (freeX || 100) + 'px';
+            box.style.top = (freeY || (window.innerHeight - 100)) + 'px';
+            box.style.bottom = 'auto';
+            box.style.transform = 'none';
+            if (freeW) box.style.width = freeW + 'px';
+        } else {
+            // bottom (기본)
+            box.style.left = '50%'; box.style.top = '';
+            box.style.bottom = '20px'; box.style.transform = 'translateX(-50%)';
+            box.style.width = '';
+        }
+        saveSettings();
+        document.getElementById('sub-hide-btn').classList.toggle('active', mode !== 'hidden');
+    }
+
+    function saveSettings() {
+        const r = box.getBoundingClientRect();
+        localStorage.setItem('sc-sub-settings', JSON.stringify({
+            fontSize, posMode, ccMode,
+            freeX: posMode === 'free' ? r.left : freeX,
+            freeY: posMode === 'free' ? r.top : freeY,
+            freeW: posMode === 'free' ? r.width : freeW,
+        }));
+    }
+
+    // 위치 전환 버튼: bottom↔free
+    const posIcon = document.getElementById('sub-pos-icon');
+    function updatePosIcon() {
+        if (isMobile) { posIcon.textContent = '↕'; }
+        else { posIcon.textContent = posMode === 'free' ? '⇲' : '✥'; }
+    }
+    document.getElementById('sub-pos-btn').onclick = () => {
+        if (posMode === 'hidden') { applyPos('bottom'); }
+        else { applyPos(posMode === 'bottom' ? 'free' : 'bottom'); }
+        updatePosIcon();
+    };
+    mobileQuery.addEventListener('change', updatePosIcon);
+
+    // 폰트 크기
+    document.getElementById('sub-size-up').onclick = () => {
+        fontSize = Math.min(28, fontSize + 2);
+        subText.style.fontSize = fontSize + 'px';
+        saveSettings();
+    };
+    document.getElementById('sub-size-dn').onclick = () => {
+        fontSize = Math.max(10, fontSize - 2);
+        subText.style.fontSize = fontSize + 'px';
+        saveSettings();
+    };
+
+    // CC 모드: default → text-only → hidden
+    let ccMode = saved.ccMode || 'default';
+    const ccModes = ['default', 'text-only', 'hidden'];
+
+    function applyCcMode(mode) {
+        ccMode = mode;
+        box.classList.remove('hidden', 'text-only');
+        if (mode === 'hidden') {
+            box.classList.add('hidden');
+        } else if (mode === 'text-only') {
+            box.classList.add('text-only');
+        }
+        const btn = document.getElementById('sub-hide-btn');
+        btn.style.opacity = mode === 'hidden' ? '0.4' : mode === 'text-only' ? '0.7' : '1';
+        btn.classList.toggle('active', mode === 'default');
+        saveSettings();
+    }
+
+    document.getElementById('sub-hide-btn').onclick = () => {
+        const idx = ccModes.indexOf(ccMode);
+        applyCcMode(ccModes[(idx + 1) % ccModes.length]);
+    };
+    applyCcMode(ccMode);
+
+    // PC 드래그 (free 모드)
+    let dragStartX, dragStartY, boxStartX, boxStartY, isDragging = false;
+
+    // 마우스 드래그 (PC: 자유 이동, 모바일 규격: 수직만)
+    box.addEventListener('mousedown', (e) => {
+        if (posMode !== 'free' || e.target.tagName === 'BUTTON') return;
+        isDragging = true;
+        box.classList.add('dragging');
+        dragStartX = e.clientX; dragStartY = e.clientY;
+        const r = box.getBoundingClientRect();
+        boxStartX = r.left; boxStartY = r.top;
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dy = e.clientY - dragStartY;
+        box.style.top = (boxStartY + dy) + 'px';
+        box.style.bottom = 'auto';
+        if (!isMobile) {
+            const dx = e.clientX - dragStartX;
+            box.style.left = (boxStartX + dx) + 'px';
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        box.classList.remove('dragging');
+        freeX = parseInt(box.style.left);
+        freeY = parseInt(box.style.top);
+        saveSettings();
+    });
+
+    // 모바일 터치 드래그 (free 모드 — 수직 이동만)
+    box.addEventListener('touchstart', (e) => {
+        if (posMode !== 'free') return;
+        isDragging = true;
+        box.classList.add('dragging');
+        const touch = e.touches[0];
+        dragStartY = touch.clientY;
+        const r = box.getBoundingClientRect();
+        boxStartY = r.top;
+    }, {passive: true});
+
+    document.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        const touch = e.touches[0];
+        const newY = boxStartY + touch.clientY - dragStartY;
+        box.style.top = newY + 'px';
+        box.style.bottom = 'auto';
+        box.style.left = '50%';
+        box.style.transform = 'translateX(-50%)';
+    }, {passive: true});
+
+    document.addEventListener('touchend', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        box.classList.remove('dragging');
+        freeY = parseInt(box.style.top);
+        saveSettings();
+    });
+
+    // 초기 적용
+    applyPos(posMode);
+    updatePosIcon();
+}
 </script>
 </body>
 </html>
