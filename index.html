@@ -141,8 +141,9 @@ body {
     display: flex; gap: 3px; padding: 10px 24px;
     overflow-x: auto; background: var(--bg-surface);
     border-bottom: 1px solid var(--border-dim);
-    justify-content: center; flex-wrap: wrap;
+    justify-content: flex-start; flex-wrap: nowrap;
     scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
 }
 #slide-nav::-webkit-scrollbar { display: none; }
 
@@ -154,6 +155,7 @@ body {
     display: flex; align-items: center; justify-content: center;
     transition: var(--transition);
     position: relative;
+    flex-shrink: 0;
 }
 .nav-dot.has-audio {
     background: rgba(124,92,62,0.07); color: var(--accent);
@@ -196,13 +198,10 @@ body {
     font-size: 10px; padding: 3px 10px; border-radius: 20px;
     font-weight: 500; letter-spacing: 0.3px;
 }
-.badge-audio {
-    background: var(--green-dim); color: var(--green);
-    border: 1px solid rgba(22,163,74,0.15);
-}
 .badge-no-audio {
-    background: var(--red-dim); color: var(--red);
-    border: 1px solid rgba(220,38,38,0.12);
+    background: var(--gold-dim); color: var(--accent);
+    border: 1px solid rgba(124,92,62,0.2);
+    font-weight: 600;
 }
 
 #slide-title {
@@ -368,12 +367,16 @@ body {
     display: flex;
     gap: 1px;
     border-radius: 4px;
-    overflow: hidden;
+    overflow-x: auto; overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
     background: var(--border-dim);
+    scrollbar-width: none;
 }
+#audio-map::-webkit-scrollbar { display: none; }
 .map-segment {
     height: 100%;
     min-width: 20px;
+    flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     font-size: 9px; font-weight: 500;
     font-family: 'JetBrains Mono', monospace;
@@ -389,9 +392,10 @@ body {
     z-index: 1;
 }
 .map-segment.active {
-    filter: brightness(1.2);
-    color: #fff;
-    font-weight: 700;
+    filter: brightness(1.15);
+    color: #FDF9F6;
+    font-weight: 500;
+    box-shadow: inset 0 0 0 1.5px rgba(124,92,62,0.6);
 }
 /* 구간별 색상 */
 .map-segment:nth-of-type(odd)  { background: rgba(124,92,62,0.5); }
@@ -478,10 +482,11 @@ body {
     color: var(--text-primary);
     font-weight: 500;
 }
-.index-item.has-audio .idx-id::after {
-    content: ' ♪';
-    color: var(--green);
-    font-size: 8px;
+/* 교안 전용 목차 항목 */
+.index-item:not(.has-audio) .idx-id::after {
+    content: ' ✦';
+    color: var(--accent);
+    font-size: 7px;
 }
 
 /* ========== 반응형 ========== */
@@ -500,14 +505,9 @@ body {
     #time-display { min-width: 70px; font-size: 10px; }
     #speed-select { padding: 4px 6px; font-size: 10px; }
 
-    /* 네비게이션 도트: 가로 스크롤 */
-    #slide-nav {
-        flex-wrap: nowrap;
-        justify-content: flex-start;
-        padding: 8px 12px;
-        gap: 2px;
-    }
-    .nav-dot { width: 28px; height: 26px; font-size: 9px; flex-shrink: 0; }
+    /* 네비게이션 도트 */
+    #slide-nav { padding: 8px 12px; gap: 2px; }
+    .nav-dot { width: 28px; height: 26px; font-size: 9px; }
 
     /* 슬라이드 영역 */
     #slide-container { padding: 20px 14px 80px; }
@@ -524,38 +524,113 @@ body {
     .slide-points li { font-size: 13.5px; }
     .slide-image img { max-height: 50vh; }
 
-    /* 자막 바 */
-    #subtitle-bar { padding: 10px 14px; }
-    #subtitle-text { font-size: 0.9rem; }
+    /* 자막 */
+    #subtitle-box { padding: 8px 14px; border-radius: 8px; }
+    #subtitle-text { font-size: 0.85rem; }
 }
 
-/* 자막 바 */
-#subtitle-bar {
+/* ========== 플로팅 자막 ========== */
+#subtitle-box {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    text-align: center;
-    padding: 12px 24px;
-    background: rgba(250,249,247,0.95);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border-top: 1px solid var(--border-dim);
+    bottom: 20px; left: 50%;
+    transform: translateX(-50%);
     z-index: 1000;
-    pointer-events: none;
-    min-height: 24px;
+    background: rgba(28,25,23,0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 10px;
+    padding: 10px 18px;
+    max-width: 680px;
+    width: 90vw;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+    transition: opacity 0.2s;
+    cursor: default;
+    user-select: none;
 }
+#subtitle-box.dragging { opacity: 0.85; transition: none; }
+#subtitle-box.hidden { display: none; }
+#subtitle-box.text-only {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+}
+#subtitle-box.text-only #subtitle-text {
+    color: var(--text-primary);
+    text-shadow: 0 0 8px var(--bg-void), 0 0 16px var(--bg-void);
+}
+
+/* PC 드래그 모드 */
+#subtitle-box.free {
+    transform: none;
+    cursor: grab;
+    resize: both;
+    overflow: hidden;
+    min-width: 200px;
+    min-height: 40px;
+}
+#subtitle-box.free:active { cursor: grabbing; }
 
 #subtitle-text {
-    color: var(--text-secondary);
+    color: #F0EDE8;
     font-size: 1rem;
-    line-height: 1.5;
-    transition: opacity 0.15s ease;
+    line-height: 1.6;
+    pointer-events: none;
+}
+#subtitle-text:empty::after {
+    content: '';
+}
+#subtitle-box:has(#subtitle-text:empty) {
+    opacity: 0;
+    pointer-events: none;
+}
+#subtitle-box:has(#subtitle-text:not(:empty)) {
+    opacity: 1;
+    pointer-events: auto;
 }
 
-#subtitle-bar:empty,
-#subtitle-bar:has(#subtitle-text:empty) {
-    opacity: 0;
+/* 자막 컨트롤 */
+#sub-controls {
+    position: fixed;
+    bottom: 20px; left: 20px;
+    z-index: 1001;
+    display: flex;
+    gap: 3px;
+    flex-direction: row;
+}
+.sub-ctrl-btn {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(28,25,23,0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #D6D3D1;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: 0.15s;
+}
+.sub-ctrl-btn:hover {
+    background: rgba(28,25,23,0.9);
+    color: #fff;
+}
+.sub-ctrl-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: transparent;
+}
+
+@media (max-width: 900px) {
+    #subtitle-box { max-width: 95vw; width: 95vw; padding: 8px 14px; border-radius: 8px; }
+    #subtitle-box.free {
+        cursor: default; resize: none;
+        left: 50% !important; transform: translateX(-50%) !important;
+        width: 95vw !important;
+    }
+    #sub-controls { bottom: 14px; left: 14px; }
+    .sub-ctrl-btn { width: 30px; height: 30px; font-size: 12px; }
 }
 
 /* ========== 모바일 목차 FAB + 오버레이 ========== */
