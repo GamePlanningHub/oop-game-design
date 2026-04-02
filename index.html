@@ -484,9 +484,13 @@ body {
 }
 /* 교안 전용 목차 항목 */
 .index-item:not(.has-audio) .idx-id::after {
-    content: ' ✦';
-    color: var(--accent);
-    font-size: 7px;
+    content: '';
+    display: inline-block;
+    width: 5px; height: 5px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin-left: 3px;
+    vertical-align: middle;
 }
 
 /* ========== 반응형 ========== */
@@ -1236,8 +1240,11 @@ function initSubtitleControls() {
     // 위치 전환 버튼: bottom↔free
     const posIcon = document.getElementById('sub-pos-icon');
     function updatePosIcon() {
-        if (isMobile) { posIcon.textContent = '↕'; }
-        else { posIcon.textContent = posMode === 'free' ? '⇲' : '✥'; }
+        const svgMove = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M5 5l-3 3 3 3M19 5l3 3-3 3M5 19l-3-3 3-3M19 19l3-3-3-3"/></svg>';
+        const svgVert = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M5 5l7-3 7 3M5 19l7 3 7-3"/></svg>';
+        const svgDock = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M3 3h18v7H3z" opacity="0.3"/></svg>';
+        if (isMobile) { posIcon.innerHTML = posMode === 'free' ? svgVert : svgDock; }
+        else { posIcon.innerHTML = posMode === 'free' ? svgDock : svgMove; }
     }
     document.getElementById('sub-pos-btn').onclick = () => {
         if (posMode === 'hidden') { applyPos('bottom'); }
